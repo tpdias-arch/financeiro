@@ -1,0 +1,71 @@
+<!doctype html>
+<!--
+  Moldura do Sistema Financeiro Familiar (decisão 74) — publicada no GitHub Pages.
+
+  Por quê: o Google mostra "Este aplicativo foi criado por um usuário do Google Apps Script" (Denunciar abuso · Saiba mais · X)
+  sempre que a página do Web App é a janela principal do navegador. O próprio script do Google (warden.js, goog.script.init)
+  só monta esse aviso quando window.self === window.top; com o Web App dentro de um iframe de outra página, ele não aparece.
+  O doGet já serve o painel, a consulta e a tela de bloqueio com XFrameOptionsMode.ALLOWALL, que é o que deixa embutir.
+
+  Segredo nenhum mora aqui: a implantação e a chave chegam no FRAGMENTO do link (depois do "#"), que o navegador nunca envia
+  ao servidor do GitHub Pages — só este script o lê, no próprio aparelho. Link: <endereço desta página>#u=<ID da implantação>&t=<chave>
+  O ID é validado (só implantações do Apps Script, "AKfyc…"), para esta página não servir de moldura para outro site.
+
+  Sem manifest de propósito: o "Adicionar à tela inicial" guarda o link inteiro (com o "#"); um manifest trocaria pelo start_url
+  dele e perderia a chave.
+-->
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#2c3e50">
+  <meta name="apple-mobile-web-app-title" content="Financeiro">
+  <title>Financeiro Familiar</title>
+  <link rel="icon" href="icone.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icone-180.png">
+  <style>
+    :root { --fundo: #f4f6f8; --texto: #2c3e50; --suave: #57606f; }
+    @media (prefers-color-scheme: dark) { :root { --fundo: #1e272e; --texto: #ecf0f1; --suave: #a4b0be; } }
+    html, body { margin: 0; height: 100%; background: var(--fundo); color: var(--texto); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    body { overflow: hidden; }
+    #app { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; display: none; background: #fff; }
+    #aviso { display: none; max-width: 420px; margin: 0 auto; padding: 80px 16px; text-align: center; line-height: 1.5; }
+    #aviso h1 { font-size: 20px; margin: 0 0 12px; }
+    #aviso p { margin: 0 0 8px; color: var(--suave); font-size: 14px; }
+  </style>
+</head>
+<body>
+  <iframe id="app" title="Financeiro Familiar"
+          allow="clipboard-read; clipboard-write; fullscreen"></iframe>
+  <div id="aviso" role="alert">
+    <h1>🔒 Link incompleto</h1>
+    <p>Este endereço precisa da chave de acesso, que vem no próprio link que você recebeu (depois do “#”).</p>
+    <p>Abra o link completo de novo ou peça um novo a quem o enviou.</p>
+  </div>
+  <script>
+    // Lê "#u=<ID da implantação>&t=<chave>" e devolve o endereço do Web App, ou null se faltar algo ou o ID não for do Apps Script.
+    function montarEndereco(fragmento) {
+      var p = {};
+      String(fragmento || '').replace(/^#/, '').split('&').forEach(function (par) {
+        var i = par.indexOf('=');
+        if (i > 0) { try { p[par.slice(0, i)] = decodeURIComponent(par.slice(i + 1)); } catch (e) { /* par malformado: ignora */ } }
+      });
+      var id = p.u || '', chave = p.t || '';
+      if (!/^AKfyc[A-Za-z0-9_-]{20,}$/.test(id) || !/^[A-Za-z0-9_-]{8,64}$/.test(chave)) return null;
+      return 'https://script.google.com/macros/s/' + id + '/exec?token=' + encodeURIComponent(chave);
+    }
+    function abrir() {
+      var endereco = montarEndereco(location.hash);
+      var app = document.getElementById('app'), aviso = document.getElementById('aviso');
+      if (!endereco) { app.style.display = 'none'; app.removeAttribute('src'); aviso.style.display = 'block'; return; }
+      aviso.style.display = 'none';
+      app.style.display = 'block';
+      if (app.getAttribute('src') !== endereco) app.setAttribute('src', endereco);
+    }
+    window.addEventListener('hashchange', abrir);
+    abrir();
+  </script>
+</body>
+</html>
