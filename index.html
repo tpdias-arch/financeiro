@@ -10,6 +10,11 @@
   Segredo nenhum mora aqui: a implantação e a chave chegam no FRAGMENTO do link (depois do "#"), que o navegador nunca envia
   ao servidor do GitHub Pages — só este script o lê, no próprio aparelho. Link: <endereço desta página>#u=<ID da implantação>&t=<chave>
   O ID é validado (só implantações do Apps Script, "AKfyc…"), para esta página não servir de moldura para outro site.
+  Decisão 88 (R-141): e só o Web App DO SISTEMA é aceito — esta página guarda o RESUMO (SHA-256) do ID da implantação em uso,
+  não o ID, e recusa qualquer outro (um Web App de terceiro não aparece aqui com o título e o ícone da família). Se um dia a
+  implantação mudar (clasp deploy SEM -i cria outra, com outro ID), troque o resumo em RESUMOS_PERMITIDOS pelo do ID novo:
+  no Git Bash do PC, printf %s 'ID-DA-IMPLANTACAO' | sha256sum (os 64 caracteres antes do "-"). A cópia publicada no
+  GitHub Pages fica em outro repositório: esta pasta é a fonte; copiar o arquivo para lá a cada mudança.
 
   Sem manifest de propósito: o "Adicionar à tela inicial" guarda o link inteiro (com o "#"); um manifest trocaria pelo start_url
   dele e perderia a chave.
@@ -38,10 +43,10 @@
 </head>
 <body>
   <iframe id="app" title="Financeiro Familiar"
-          allow="clipboard-read; clipboard-write; fullscreen"></iframe>
+          allow="clipboard-write"></iframe>
   <div id="aviso" role="alert">
-    <h1>🔒 Link incompleto</h1>
-    <p>Este endereço precisa da chave de acesso, que vem no próprio link que você recebeu (depois do “#”).</p>
+    <h1>🔒 Link incompleto ou inválido</h1>
+    <p>Este endereço precisa do link completo que você recebeu, com a chave de acesso (depois do “#”).</p>
     <p>Abra o link completo de novo ou peça um novo a quem o enviou.</p>
   </div>
   <script>
@@ -56,13 +61,32 @@
       if (!/^AKfyc[A-Za-z0-9_-]{20,}$/.test(id) || !/^[A-Za-z0-9_-]{8,64}$/.test(chave)) return null;
       return 'https://script.google.com/macros/s/' + id + '/exec?token=' + encodeURIComponent(chave);
     }
+    // Decisão 88 (R-141): o resumo SHA-256 do ID da implantação do Web App do sistema (o ID em si não fica escrito aqui).
+    var RESUMOS_PERMITIDOS = ['c0724d5a836077597787d9d520fd803fe6c4847c045192381bf96ea7ccceca07'];
+    // Promessa de true se o ID é o do Web App do sistema. Sem o resumo do navegador (página fora de HTTPS), recusa.
+    function doSistema(id) {
+      var cr = window.crypto || (typeof crypto !== 'undefined' ? crypto : null);
+      if (!cr || !cr.subtle || typeof TextEncoder === 'undefined') return Promise.resolve(false);
+      return cr.subtle.digest('SHA-256', new TextEncoder().encode(id)).then(function (buf) {
+        var hex = Array.prototype.map.call(new Uint8Array(buf), function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+        return RESUMOS_PERMITIDOS.indexOf(hex) !== -1;
+      }, function () { return false; });
+    }
+    var vez = 0; // troca do "#" no meio de outra conferência: vale a última
     function abrir() {
+      var minha = ++vez;
       var endereco = montarEndereco(location.hash);
       var app = document.getElementById('app'), aviso = document.getElementById('aviso');
-      if (!endereco) { app.style.display = 'none'; app.removeAttribute('src'); aviso.style.display = 'block'; return; }
-      aviso.style.display = 'none';
-      app.style.display = 'block';
-      if (app.getAttribute('src') !== endereco) app.setAttribute('src', endereco);
+      var recusar = function () { app.style.display = 'none'; app.removeAttribute('src'); aviso.style.display = 'block'; };
+      if (!endereco) { recusar(); return; }
+      var id = endereco.split('/macros/s/')[1].split('/exec')[0];
+      doSistema(id).then(function (ok) {
+        if (minha !== vez) return;
+        if (!ok) { recusar(); return; }
+        aviso.style.display = 'none';
+        app.style.display = 'block';
+        if (app.getAttribute('src') !== endereco) app.setAttribute('src', endereco);
+      });
     }
     window.addEventListener('hashchange', abrir);
     abrir();
